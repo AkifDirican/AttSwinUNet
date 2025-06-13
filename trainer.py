@@ -7,10 +7,12 @@ from tqdm import tqdm
 
 def trainer(config,Net,train_loader,test_loader,optimizer,criteria,args):
     best_F1_score = 0.0
-    for ep in range(int(config['epochs'])):
+    num_epochs = int(config['epochs'])
+    for ep in range(num_epochs):
         device = 'cuda' if torch.cuda.is_available() else 'cpu'
         Net.train()
         epoch_loss = 0
+        num_batches = len(train_loader)
         for itter, batch in enumerate(train_loader):
             img = batch['image'].to(device, dtype=torch.float)
             msk = batch['mask'].to(device)
@@ -22,6 +24,8 @@ def trainer(config,Net,train_loader,test_loader,optimizer,criteria,args):
             loss.backward()
             epoch_loss += loss.item()
             optimizer.step()  
+            percent = 100.0 * (itter + 1) / num_batches
+            print(f"Epoch {ep+1}/{num_epochs} - Batch {itter+1}/{num_batches} ({percent:.1f}%) - Loss: {loss.item():.4f}")
         if itter%int(float(config['progress_p']) * len(train_loader))==0:
             print(f' Epoch>> {ep+1} and itteration {itter+1} Loss>> {((epoch_loss/(itter+1)))}')
 

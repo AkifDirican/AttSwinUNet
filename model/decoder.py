@@ -125,7 +125,7 @@ class Decoder(nn.Module):
     def __init__(self,embed_dim,depths,num_heads,window_size,\
       mlp_ratio,img_size,qkv_bias,qk_scale,drop_rate,attn_drop_rate,norm_layer,\
       use_checkpoint,num_layers,patch_size=4, in_chans=3,\
-      drop_path_rate=0.1,patch_embed = None,patch_norm=True,final_upsample="expand_first",num_classes=9,args = None):
+      drop_path_rate=0.1,patch_embed = None,patch_norm=True,final_upsample="expand_first",num_classes=1,args = None):
         super().__init__()
         self.patch_norm     = patch_norm
         self.num_layers     = num_layers
@@ -139,7 +139,7 @@ class Decoder(nn.Module):
         self.num_features   = int(embed_dim * 2 ** (self.num_layers - 1))
         self.embed_dim      = embed_dim
         num_patches         = patch_embed.num_patches
-        pretrained_dict     = torch.load('./pretrained_ckpt/xcit_tiny_12_p16_224.pth', map_location='cuda')['model']
+        pretrained_dict     = torch.load('./pretrained_ckpt/xcit_tiny_12_p16_224.pth', map_location='cpu')['model']
         full_dict           = copy.deepcopy(pretrained_dict)     
        
         # build  cross contextual attention module

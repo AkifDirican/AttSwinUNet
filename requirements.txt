@@ -4,11 +4,10 @@ tensorboard
 tensorboardX
 ml-collections
 medpy
-SimpleITK
+SimpleITK==2.1.1
 scipy
 h5py
 einops
 timm
 yacs
 PyYaml==5.1
-ml_collections

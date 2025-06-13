@@ -2,9 +2,6 @@ from __future__ import division
 import os
 import argparse
 
-import pandas as pd
-import glob
-import nibabel as nib
 from tqdm import tqdm
 import numpy as np
 import copy
@@ -17,7 +14,7 @@ import torch.optim as optim
 from torch.utils.data import DataLoader
 
 from loader import *
-from networks.attention_swin_unet import SwinAttentionUnet as ViT_seg
+from model.attention_swin_unet import SwinAttentionUnet as ViT_seg
 from configs import swin_attention_unet as config
 
 os.environ["CUDA_VISIBLE_DEVICES"] = "0"
@@ -36,7 +33,7 @@ parser.add_argument('--dataset', type=str,
 parser.add_argument('--list_dir', type=str,
                     default='./lists/lists_Synapse', help='list dir')
 parser.add_argument('--num_classes', type=int,
-                    default=9, help='output channel of network')
+                    default=1, help='output channel of network')
 parser.add_argument('--saved_model', type=str,
                     default='./weights/weights_isic17.model' , help='output dir')                   
 parser.add_argument('--max_iterations', type=int,
@@ -87,6 +84,7 @@ parser.add_argument('--attention', help='0 or 1',
 args = parser.parse_args(args=[])
 config =  config.get_swin_unet_attention_configs().to_dict()
 config.update(vars(args))
+config['num_classes'] = 1
 configs = SimpleNamespace(**config)
 #skin config
 config         = yaml.load(open('./configs/config_skin.yml'), Loader=yaml.FullLoader)
@@ -102,18 +100,17 @@ val_loader    = DataLoader(val_dataset, batch_size = int(config['batch_size_va']
 test_dataset  = isic_loader(path_Data = data_path, train = False, Test = True)
 test_loader   = DataLoader(test_dataset, batch_size = 1, shuffle= True)
 #build model
-Net   = ViT_seg(configs,num_classes=args.num_classes).cuda()
-Net   = Net.to(device)
+Net   = ViT_seg(configs,num_classes=1).to(device)
 if int(config['pretrained']):
     Net.load_state_dict(torch.load(config['saved_model'], map_location='cpu')['model_weights'])
     best_val_loss = torch.load(config['saved_model'], map_location='cpu')['val_loss']
 
 optimizer = optim.Adam(Net.parameters(), lr= float(config['lr']))
 scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', factor = 0.5, patience = config['patience'])
-criteria  = torch.nn.BCELoss()
-trainer(config,Net,train_loader,test_loader,optimizer,criteria,configs)
-        
-        
-        
-        
+criteria  = torch.nn.BCEWithLogitsLoss()
+trainer.trainer(config,Net,train_loader,test_loader,optimizer,criteria,configs)
+
+
+
+
 

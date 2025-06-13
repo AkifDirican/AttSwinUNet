@@ -10,9 +10,16 @@ def dataset_normalized(imgs):
     imgs_normalized = np.empty(imgs.shape)
     imgs_std = np.std(imgs)
     imgs_mean = np.mean(imgs)
+    if imgs_std == 0:
+        imgs_std = 1e-8  # Prevent division by zero
     imgs_normalized = (imgs-imgs_mean)/imgs_std
     for i in range(imgs.shape[0]):
-        imgs_normalized[i] = ((imgs_normalized[i] - np.min(imgs_normalized[i])) / (np.max(imgs_normalized[i])-np.min(imgs_normalized[i])))*255
+        min_val = np.min(imgs_normalized[i])
+        max_val = np.max(imgs_normalized[i])
+        if max_val - min_val == 0:
+            imgs_normalized[i] = np.zeros_like(imgs_normalized[i])
+        else:
+            imgs_normalized[i] = ((imgs_normalized[i] - min_val) / (max_val - min_val)) * 255
     return imgs_normalized
 
 

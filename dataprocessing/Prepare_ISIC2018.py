@@ -10,8 +10,8 @@ import scipy.misc as sc
 import glob
 
 # Parameters
-height = 256
-width  = 256
+height = 224
+width  = 224
 channels = 3
 
 ############################################################# Prepare ISIC 2018 data set #################################################
