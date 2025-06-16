@@ -7,12 +7,11 @@ from scipy.ndimage.morphology import binary_dilation
 
 # ===== normalize over the dataset 
 def dataset_normalized(imgs):
-    imgs_normalized = np.empty(imgs.shape)
     imgs_std = np.std(imgs)
     imgs_mean = np.mean(imgs)
-    if imgs_std == 0:
-        imgs_std = 1e-8  # Prevent division by zero
-    imgs_normalized = (imgs-imgs_mean)/imgs_std
+    if imgs_std < 1e-7:  # Use threshold instead of exact zero
+        return np.zeros_like(imgs)  # Return zeros for constant images
+    imgs_normalized = (imgs - imgs_mean) / imgs_std
     for i in range(imgs.shape[0]):
         min_val = np.min(imgs_normalized[i])
         max_val = np.max(imgs_normalized[i])

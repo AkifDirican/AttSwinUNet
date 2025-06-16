@@ -29,38 +29,28 @@ def trainer(config,Net,train_loader,test_loader,optimizer,criteria,args):
         if itter%int(float(config['progress_p']) * len(train_loader))==0:
             print(f' Epoch>> {ep+1} and itteration {itter+1} Loss>> {((epoch_loss/(itter+1)))}')
 
-    predictions = []
-    gt = []
+        if (ep+1)%args.eval_interval==0:
+            with torch.no_grad():
+                print('val_mode')
+                predictions, gt = [], []
+                Net.eval()
+                for batch in test_loader:
+                    img = batch['image'].to(device, dtype=torch.float32)
+                    msk = batch['mask'].float()
+                    msk_pred = torch.sigmoid(Net(img))           # <-- convert logits → prob
 
-    if (ep+1)%args.eval_interval==0:
-        with torch.no_grad():
-            print('val_mode')
-            val_loss = 0
-            Net.eval()
-            for itter, batch in tqdm(enumerate(test_loader)):
-                img = batch['image'].to(device, dtype=torch.float)
-                msk = batch['mask']
-                msk_pred = Net(img)
+                    gt.append((msk[0, 0] >= 0.5).cpu().numpy().astype(np.uint8))
+                    pred_bin = (msk_pred[0, 0] >= 0.5).cpu().numpy().astype(np.uint8)
+                    predictions.append(pred_bin)
 
-                gt.append(msk.numpy()[0, 0])
-                msk_pred = msk_pred.cpu().detach().numpy()[0, 0]
-                msk_pred  = np.where(msk_pred>=0.4, 1, 0)
-                predictions.append(msk_pred)        
+            predictions = np.asarray(predictions).ravel()
+            gt = np.asarray(gt).ravel()
 
-        predictions = np.array(predictions)
-        gt = np.array(gt)
-
-        y_scores = predictions.reshape(-1)
-        y_true   = gt.reshape(-1)
-
-        y_scores2 = np.where(y_scores>0.5, 1, 0)
-        y_true2   = np.where(y_true>0.5, 1, 0)
-
-        #F1 score
-        F1_score = f1_score(y_true2, y_scores2, labels=None, average='binary', sample_weight=None)
-        print ("\nF1 score (F-measure) or DSC: " +str(F1_score))    
-        if (F1_score) > best_F1_score:
-            print('New best loss, saving...')
-            best_F1_score = copy.deepcopy(F1_score)
-            state = copy.deepcopy({'model_weights': Net.state_dict(), 'test_F1_score': F1_score})
-            torch.save(state, args.saved_model)
+            #F1 score
+            F1_score = f1_score(gt, predictions, zero_division=1)
+            print(f'F1 / DSC : {F1_score:.4f}')
+            if (F1_score) > best_F1_score:
+                print('New best loss, saving...')
+                best_F1_score = copy.deepcopy(F1_score)
+                state = copy.deepcopy({'model_weights': Net.state_dict(), 'test_F1_score': F1_score})
+                torch.save(state, args.saved_model)

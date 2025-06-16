@@ -1,6 +1,9 @@
 from __future__ import division
+import sys
 import os
-os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+sys.path.append(os.path.abspath(os.path.dirname(__file__)))
+
+os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 import torch
 import torch.optim as optim
 from torch.utils.data import DataLoader
@@ -10,29 +13,29 @@ import numpy as np
 import copy
 import yaml
 from tqdm import tqdm
-from networks.attention_swin_unet import SwinAttentionUnet as ViT_seg
+from model.attention_swin_unet import SwinAttentionUnet as ViT_seg
 from sklearn.metrics import confusion_matrix,f1_score
 from matplotlib import pyplot as plt
 from scipy.ndimage.morphology import binary_fill_holes, binary_opening
 import argparse
 from configs import swin_attention_unet as config
 from types import SimpleNamespace 
-from .inference import inference
+from inference import inference
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--root_path', type=str,
                     default='./Synapse/', help='root dir for data')
 parser.add_argument('--eval_interval', type=int, default=5, help='eval interval')
 parser.add_argument('--volume_path', type=str,
-                    default='./weights/weights_isic17_swin_with_attention_add.model', help='the weight path')
+                    default='./OUT_DIR/best_model.pth', help='the weight path')
 parser.add_argument('--dataset', type=str,
                     default='Synapse', help='experiment_name')
 parser.add_argument('--list_dir', type=str,
                     default='./lists/lists_Synapse', help='list dir')
 parser.add_argument('--num_classes', type=int,
-                    default=9, help='output channel of network')
+                    default=1, help='output channel of network')
 parser.add_argument('--saved_model', type=str,
-                    default='./weights/weights_isic17.model' , help='output dir')                   
+                    default='./OUT_DIR/best_model.pth' , help='output dir')                   
 parser.add_argument('--max_iterations', type=int,
                     default=30000, help='maximum epoch number to train')
 parser.add_argument('--max_epochs', type=int,
@@ -75,10 +78,13 @@ parser.add_argument('--skip_num', help='Select our contribution',
                     choices=['0', '1', '2','3'], default='3'),
 parser.add_argument('--operationaddatten', help='Select our contribution',
                     choices=['+', 'mul'], default='+')
-parser.add_argument('--attention', help='0 or 1',
+parser.add_argument('--spatial_attention', help='0 or 1',
                     choices=['0',"1"], default="0")
+parser.add_argument('--isxvit', type=str, 
+                    choices=['0', '1'], default='1',
+                    help='Enable CrossViT layers')
 device = 'cuda' if torch.cuda.is_available() else 'cpu'               
-args = parser.parse_args(args=[])
+args = parser.parse_args()
 config =  config.get_swin_unet_attention_configs().to_dict()
 config.update(vars(args))
 configs = SimpleNamespace(**config)
@@ -92,7 +98,24 @@ test_dataset = isic_loader(path_Data = data_path, train = False, Test = True)
 test_loader  = DataLoader(test_dataset, batch_size = 1)
 
 Net = ViT_seg(configs,num_classes=args.num_classes).cuda()
-Net = Net.to(device) 
+Net = Net.to(device)
+
+print(f"Test config: mode={configs.mode}, spatial_attention={configs.spatial_attention}")
+# Load weights with error handling
+try:
+    checkpoint = torch.load(configs.volume_path, map_location='cpu')
+    if 'model_weights' in checkpoint:
+        Net.load_state_dict(checkpoint['model_weights'])
+    else:
+        Net.load_state_dict(checkpoint)
+    print(f"Successfully loaded model from {configs.volume_path}")
+except RuntimeError as e:
+    print(f"Error loading model: {e}")
+    print("\nMake sure you're using the same arguments as training:")
+    print("  --mode cross_contextual_attention")
+    print("  --spatial_attention 1")
+    exit(1)
+
 Net.load_state_dict(torch.load(configs.volume_path, map_location='cpu')['model_weights'])
 inference(Net,test_loader)
 

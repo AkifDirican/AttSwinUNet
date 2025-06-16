@@ -1,10 +1,10 @@
 ## Config file
 lr:              1e-4 # Initial learning rate
-epochs:          20 # Number of epochs to train the model 
+epochs:          5 # Number of epochs to train the model 
 number_classes:  1 # Number of classes in the target dataset
 batch_size_tr:   24 # Batch size for train
 batch_size_va:   1 # Batch size for validationn 
-saved_model_p:   './weights/weights_isic17.model' # leave '' will use a default value 
+saved_model_p:   './OUT_DIR/' # leave '' will use a default value 
 path_to_data:    './' #path to dataset
 patience:        10 # number of epochs without improvement to do before finishing training early.
 save_result:     './OUT_DIR/' # path to save results

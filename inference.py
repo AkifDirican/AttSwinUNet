@@ -1,6 +1,6 @@
 import torch
 import numpy as np
-import tqdm
+from tqdm import tqdm
 from scipy.ndimage.morphology import binary_fill_holes, binary_opening
 from sklearn.metrics import confusion_matrix,f1_score
 

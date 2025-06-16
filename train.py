@@ -17,7 +17,7 @@ from loader import *
 from model.attention_swin_unet import SwinAttentionUnet as ViT_seg
 from configs import swin_attention_unet as config
 
-os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 
 from scipy.ndimage.morphology import binary_fill_holes, binary_opening
 from sklearn.metrics import f1_score
@@ -35,11 +35,11 @@ parser.add_argument('--list_dir', type=str,
 parser.add_argument('--num_classes', type=int,
                     default=1, help='output channel of network')
 parser.add_argument('--saved_model', type=str,
-                    default='./weights/weights_isic17.model' , help='output dir')                   
+                    default='./OUT_DIR/best_model.pth' , help='output dir')                   
 parser.add_argument('--max_iterations', type=int,
                     default=30000, help='maximum epoch number to train')
 parser.add_argument('--max_epochs', type=int,
-                    default=150, help='maximum epoch number to train')
+                    default=120, help='maximum epoch number to train')
 parser.add_argument('--batch_size', type=int,
                     default=24, help='batch_size per gpu')
 parser.add_argument('--n_gpu', type=int, default=1, help='total gpu')
@@ -78,10 +78,11 @@ parser.add_argument('--skip_num', help='Select our contribution',
                     choices=['0', '1', '2','3'], default='3'),
 parser.add_argument('--operationaddatten', help='Select our contribution',
                     choices=['+', 'mul'], default='+')
-parser.add_argument('--attention', help='0 or 1',
+parser.add_argument('--spatial_attention', help='0 or 1',
                     choices=['0',"1"], default="0")
+parser.add_argument('--isxvit', type=str, default='0', help='Enable cross contextual attention (1 or 0)')
 
-args = parser.parse_args(args=[])
+args = parser.parse_args()
 config =  config.get_swin_unet_attention_configs().to_dict()
 config.update(vars(args))
 config['num_classes'] = 1

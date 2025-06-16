@@ -25,7 +25,7 @@ class SwinAttentionUnet(nn.Module):
         super().__init__()
         self.img_size        = config.image_size
         self.patch_size      = config.patch_size
-        self.in_chans        = config.patch_size
+        self.in_chans        = config.in_chans
         self.embed_dim       = config.embed_dim
         self.depths          = config.depths
         self.num_heads       = config.num_heads

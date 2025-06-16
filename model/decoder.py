@@ -132,6 +132,7 @@ class Decoder(nn.Module):
         self.mlp_ratio      = mlp_ratio
         self.final_upsample = final_upsample
         self.num_classes    = num_classes
+        self.isxvit         = getattr(args, 'isxvit', '0')
         self.mode           = args.mode
         self.skip_num       = args.skip_num
         self.operation      = args.operationaddatten
@@ -139,7 +140,7 @@ class Decoder(nn.Module):
         self.num_features   = int(embed_dim * 2 ** (self.num_layers - 1))
         self.embed_dim      = embed_dim
         num_patches         = patch_embed.num_patches
-        pretrained_dict     = torch.load('./pretrained_ckpt/xcit_tiny_12_p16_224.pth', map_location='cpu')['model']
+        pretrained_dict     = torch.load('./pretrained_ckpt/xcit_tiny_12_p16_224.pth', map_location='cuda')['model']
         full_dict           = copy.deepcopy(pretrained_dict)     
        
         # build  cross contextual attention module
