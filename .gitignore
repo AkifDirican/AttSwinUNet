@@ -11,4 +11,4 @@ mask_test.npy
 mask_train.npy
 mask_val.npy
 pretrained_ckpt/
-OUT_DIR/
+OUT_DIR/best_model.pth
