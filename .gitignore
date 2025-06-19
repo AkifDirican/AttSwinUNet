@@ -1,0 +1,13 @@
+ISIC2018/
+.vscode/
+__pycache__/
+configs/__pycache__/
+model/skipconnection/__pycache__/
+model/__pycache__/
+data_test.npy
+data_train.npy
+data_val.npy
+mask_test.npy
+mask_train.npy
+mask_val.npy
+pretrained_ckpt/
