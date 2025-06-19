@@ -34,6 +34,13 @@ For training and evaluating on ISIC 2017 and ph2 follow the bellow steps: :</br>
 
 - Test 
 
+Here are the commands I have used for training, testing and inference
+```bash
+python test.py --cfg configs/swin_tiny_patch4_window7_224_lite.yaml --mode cross_contextual_attention --spatial_attention 1 --isxvit 1
+
+python train.py --cfg configs/swin_tiny_patch4_window7_224_lite.yaml --root_path . --max_epochs 120 --saved_model OUT_DIR/best_model.pth  --img_size 224 --base_lr 0.05 --batch_size 24 --mode cross_contextual_attention --spatial_attention 1 --isxvit 1
+
+python lesion_segmentation_inference.py 16064
 ```bash
 python test.py --cfg configs/swin_tiny_patch4_window7_224_lite.yaml --is_saveni --volume_path your DATA_DIR --output_dir your OUT_DIR --max_epoch 150 --base_lr 0.05 --img_size 224 --batch_size 24 --mode cross_contextual_attention --spatial_attention 1
 ```
