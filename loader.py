@@ -4,67 +4,107 @@ import numpy as np
 import random
 from einops.layers.torch import Rearrange
 from scipy.ndimage.morphology import binary_dilation
+from skimage import color
+from color_utils import rgb_to_cielab, dataset_normalized_cielab
 
-# ===== normalize over the dataset 
-def dataset_normalized(imgs):
-    imgs_std = np.std(imgs)
-    imgs_mean = np.mean(imgs)
-    if imgs_std < 1e-7:  # Use threshold instead of exact zero
-        return np.zeros_like(imgs)  # Return zeros for constant images
-    imgs_normalized = (imgs - imgs_mean) / imgs_std
+def dataset_normalized_cielab_loader(imgs):
+    """
+    Normalize CIELAB dataset for the loader
+    
+    Args:
+        imgs: numpy array of shape (N, H, W, 3) - could be RGB or CIELAB
+    
+    Returns:
+        normalized_imgs: normalized CIELAB images ready for training
+    """
+    # Convert RGB to CIELAB if needed
+    if imgs.max() > 100:  # Likely RGB values [0, 255]
+        imgs_lab = np.zeros_like(imgs, dtype=np.float32)
+        for i in range(imgs.shape[0]):
+            # Convert RGB to CIELAB
+            rgb_img = imgs[i].astype(np.float32) / 255.0  # Normalize to [0, 1]
+            imgs_lab[i] = color.rgb2lab(rgb_img)
+        imgs = imgs_lab
+    
+    # Now normalize the CIELAB images
+    imgs_normalized = np.zeros_like(imgs, dtype=np.float32)
+    
     for i in range(imgs.shape[0]):
-        min_val = np.min(imgs_normalized[i])
-        max_val = np.max(imgs_normalized[i])
-        if max_val - min_val == 0:
-            imgs_normalized[i] = np.zeros_like(imgs_normalized[i])
-        else:
-            imgs_normalized[i] = ((imgs_normalized[i] - min_val) / (max_val - min_val)) * 255
+        img_lab = imgs[i].astype(np.float32)
+        
+        # Per-image normalization for each channel
+        for c in range(3):
+            channel = img_lab[:, :, c]
+            mean_val = np.mean(channel)
+            std_val = np.std(channel)
+            
+            if std_val > 1e-7:
+                channel_normalized = (channel - mean_val) / std_val
+            else:
+                channel_normalized = np.zeros_like(channel)
+            
+            # Scale to [0, 255] range for consistency
+            min_val = np.min(channel_normalized)
+            max_val = np.max(channel_normalized)
+            if max_val - min_val > 1e-7:
+                channel_normalized = ((channel_normalized - min_val) / (max_val - min_val)) * 255
+            else:
+                channel_normalized = np.zeros_like(channel_normalized)
+            
+            imgs_normalized[i, :, :, c] = channel_normalized
+    
     return imgs_normalized
 
-
-## Temporary
-class isic_loader(Dataset):
-    """ dataset class for Brats datasets
+class isic_loader_cielab(Dataset):
+    """ 
+    Updated dataset class for CIELAB color space
     """
-    def __init__(self, path_Data, train = True, Test = False):
-        super(isic_loader, self)
+    def __init__(self, path_Data, train=True, Test=False):
+        super(isic_loader_cielab, self).__init__()
         self.train = train
+        
         if train:
-          self.data   = np.load(path_Data+'data_train.npy')
-          self.mask   = np.load(path_Data+'mask_train.npy')
+            self.data = np.load(path_Data + 'data_train.npy')
+            self.mask = np.load(path_Data + 'mask_train.npy')
         else:
-          if Test:
-            self.data   = np.load(path_Data+'data_test.npy')
-            self.mask   = np.load(path_Data+'mask_test.npy')
-          else:
-            self.data   = np.load(path_Data+'data_val.npy')
-            self.mask   = np.load(path_Data+'mask_val.npy')          
-          
-          
-        self.data   = dataset_normalized(self.data)
-        self.mask   = np.expand_dims(self.mask, axis=3)
-        self.mask   = self.mask /255.
+            if Test:
+                self.data = np.load(path_Data + 'data_test.npy')
+                self.mask = np.load(path_Data + 'mask_test.npy')
+            else:
+                self.data = np.load(path_Data + 'data_val.npy')
+                self.mask = np.load(path_Data + 'mask_val.npy')
+        
+        # Convert RGB to CIELAB and normalize
+        self.data = dataset_normalized_cielab_loader(self.data)
+        
+        # Process masks
+        self.mask = np.expand_dims(self.mask, axis=3)
+        self.mask = self.mask / 255.0
 
     def __getitem__(self, indx):
         img = self.data[indx]
         seg = self.mask[indx]
+        
         if self.train:
             img, seg = self.apply_augmentation(img, seg)
         
-        seg = torch.tensor(seg.copy())
-        img = torch.tensor(img.copy())
-        img = img.permute( 2, 0, 1)
-        seg = seg.permute( 2, 0, 1)
+        seg = torch.tensor(seg.copy(), dtype=torch.float32)
+        img = torch.tensor(img.copy(), dtype=torch.float32)
+        
+        img = img.permute(2, 0, 1)  # (H, W, C) -> (C, H, W)
+        seg = seg.permute(2, 0, 1)  # (H, W, C) -> (C, H, W)
 
-        return {'image': img,
-                'mask' : seg}
+        return {'image': img, 'mask': seg}
                
     def apply_augmentation(self, img, seg):
+        """Apply augmentations - works the same for CIELAB"""
         if random.random() < 0.5:
-            img  = np.flip(img,  axis=1)
-            seg  = np.flip(seg,  axis=1)
+            img = np.flip(img, axis=1)
+            seg = np.flip(seg, axis=1)
         return img, seg
 
     def __len__(self):
         return len(self.data)
-    
+
+# For backward compatibility, you can also create an alias
+isic_loader = isic_loader_cielab

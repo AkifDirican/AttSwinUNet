@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 from PIL import Image
 from types import SimpleNamespace
 from scipy.ndimage.morphology import binary_fill_holes, binary_opening
+from skimage import color
 
 from model.attention_swin_unet import SwinAttentionUnet as ViT_seg
 from configs import swin_attention_unet as config
@@ -15,11 +16,23 @@ from configs import swin_attention_unet as config
 MODEL_PATH = "OUT_DIR/best_model.pth"
 INPUT_DIR = "/home/ad166/new/AttSwinUNet/ISIC2018/ISIC2018_Task1-2_Training_Input/"
 GROUND_TRUTH_DIR = "/home/ad166/new/AttSwinUNet/ISIC2018/ISIC2018_Task1_Training_GroundTruth/"
-OUTPUT_DIR = "image_trials"
+OUTPUT_DIR = "image_trials_CIELAB"
+
+def log_color_space_info():
+    """Log information about CIELAB color space usage"""
+    print("=" * 60)
+    print("INFERENCE WITH CIELAB COLOR SPACE")
+    print("=" * 60)
+    print("CIELAB Channel Information:")
+    print("- L* channel: Lightness (0-100)")
+    print("- a* channel: Green-Red (-127 to +127)")
+    print("- b* channel: Blue-Yellow (-127 to +127)")
+    print("Images are converted from RGB to CIELAB during inference")
+    print("=" * 60)
 
 def load_model(model_path, configs, device):
     """Load the trained model"""
-    print(f"Loading model from: {model_path}")
+    print(f"Loading CIELAB-trained model from: {model_path}")
     
     # Initialize model
     model = ViT_seg(configs, num_classes=1).to(device)
@@ -37,8 +50,8 @@ def load_model(model_path, configs, device):
     model.eval()
     return model
 
-def preprocess_image(image_path, target_size=224):
-    """Preprocess a single image for inference"""
+def preprocess_image_cielab(image_path, target_size=224):
+    """Preprocess a single image for inference in CIELAB color space"""
     # Load image
     if isinstance(image_path, str):
         image = cv2.imread(image_path)
@@ -51,26 +64,37 @@ def preprocess_image(image_path, target_size=224):
     # Resize image
     image_resized = cv2.resize(image, (target_size, target_size), interpolation=cv2.INTER_LINEAR)
     
-    # Normalize (similar to dataset_normalized function in loader.py)
-    image_normalized = image_resized.astype(np.float32)
+    # Convert RGB to CIELAB
+    print("Converting RGB to CIELAB color space...")
+    image_rgb_normalized = image_resized.astype(np.float32) / 255.0
+    image_lab = color.rgb2lab(image_rgb_normalized)
     
-    # Normalize to 0-1
-    image_normalized = image_normalized / 255.0
+    print(f"CIELAB ranges - L*: [{image_lab[:,:,0].min():.2f}, {image_lab[:,:,0].max():.2f}], "
+          f"a*: [{image_lab[:,:,1].min():.2f}, {image_lab[:,:,1].max():.2f}], "
+          f"b*: [{image_lab[:,:,2].min():.2f}, {image_lab[:,:,2].max():.2f}]")
     
-    # Additional normalization (similar to the loader)
-    mean = np.mean(image_normalized)
-    std = np.std(image_normalized)
-    if std == 0:
-        std = 1e-8
-    image_normalized = (image_normalized - mean) / std
+    # Normalize CIELAB for neural network (similar to training normalization)
+    image_normalized = np.zeros_like(image_lab, dtype=np.float32)
     
-    # Scale to 0-255
-    min_val = np.min(image_normalized)
-    max_val = np.max(image_normalized)
-    if max_val - min_val == 0:
-        image_normalized = np.zeros_like(image_normalized)
-    else:
-        image_normalized = ((image_normalized - min_val) / (max_val - min_val)) * 255
+    for c in range(3):
+        channel = image_lab[:, :, c]
+        mean_val = np.mean(channel)
+        std_val = np.std(channel)
+        
+        if std_val > 1e-7:
+            channel_normalized = (channel - mean_val) / std_val
+        else:
+            channel_normalized = np.zeros_like(channel)
+        
+        # Scale to [0, 255] range for consistency with training
+        min_val = np.min(channel_normalized)
+        max_val = np.max(channel_normalized)
+        if max_val - min_val > 1e-7:
+            channel_normalized = ((channel_normalized - min_val) / (max_val - min_val)) * 255
+        else:
+            channel_normalized = np.zeros_like(channel_normalized)
+        
+        image_normalized[:, :, c] = channel_normalized
     
     # Convert to tensor and add batch dimension
     image_tensor = torch.from_numpy(image_normalized).permute(2, 0, 1).unsqueeze(0).float()
@@ -107,14 +131,14 @@ def visualize_results(original_image, prediction, ground_truth, image_name=""):
     """Visualize the segmentation results with 3 panels"""
     fig, axes = plt.subplots(1, 3, figsize=(15, 5))
     
-    # Original image
+    # Original image (convert back to RGB for visualization)
     axes[0].imshow(original_image)
     axes[0].set_title(f'Original Image: {image_name}')
     axes[0].axis('off')
     
     # Model prediction
     axes[1].imshow(prediction, cmap='gray', vmin=0, vmax=1)
-    axes[1].set_title('Model Prediction')
+    axes[1].set_title('Model Prediction (CIELAB)')
     axes[1].axis('off')
     
     # Difference between ground truth and prediction
@@ -127,7 +151,7 @@ def visualize_results(original_image, prediction, ground_truth, image_name=""):
     return fig
 
 def inference_single_image(model, image_number, device, configs):
-    """Run inference on a single image by number"""
+    """Run inference on a single image by number using CIELAB preprocessing"""
     # Construct image path
     image_filename = f"ISIC_{image_number:07d}.jpg"
     image_path = os.path.join(INPUT_DIR, image_filename)
@@ -135,11 +159,16 @@ def inference_single_image(model, image_number, device, configs):
     if not os.path.exists(image_path):
         raise ValueError(f"Image not found: {image_path}")
     
-    print(f"Processing: {image_filename}")
+    print(f"Processing: {image_filename} (using CIELAB color space)")
     
-    # Preprocess image
-    image_tensor, original_image = preprocess_image(image_path, target_size=configs.image_size)
+    # Preprocess image in CIELAB
+    image_tensor, original_image = preprocess_image_cielab(image_path, target_size=configs.image_size)
     image_tensor = image_tensor.to(device)
+    
+    print(f"Input tensor shape: {image_tensor.shape}")
+    print(f"Input tensor ranges - Channel 0: [{image_tensor[0,0].min():.2f}, {image_tensor[0,0].max():.2f}], "
+          f"Channel 1: [{image_tensor[0,1].min():.2f}, {image_tensor[0,1].max():.2f}], "
+          f"Channel 2: [{image_tensor[0,2].min():.2f}, {image_tensor[0,2].max():.2f}]")
     
     # Run inference
     with torch.no_grad():
@@ -165,7 +194,7 @@ def inference_single_image(model, image_number, device, configs):
     
     # Save results
     os.makedirs(OUTPUT_DIR, exist_ok=True)
-    base_name = f"ISIC_{image_number:07d}"
+    base_name = f"ISIC_{image_number:07d}_cielab"
     
     fig.savefig(os.path.join(OUTPUT_DIR, f"{base_name}_comparison.png"), 
                dpi=300, bbox_inches='tight')
@@ -187,6 +216,9 @@ def main():
         print("Usage: python lesion_segmentation_inference.py <image_number1> <image_number2> ...")
         print("Example: python lesion_segmentation_inference.py 2 10")
         sys.exit(1)
+    
+    # Log CIELAB usage
+    log_color_space_info()
     
     # Parse image numbers from command line
     image_numbers = []

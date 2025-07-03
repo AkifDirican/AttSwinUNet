@@ -10,3 +10,7 @@ einops
 timm
 yacs
 PyYaml==5.1
+scikit-image>=0.18.0
+opencv-python
+Pillow
+matplotlib
