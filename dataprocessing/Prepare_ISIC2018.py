@@ -2,9 +2,7 @@
 """
 Updated ISIC 2018 data preparation script for CIELAB color space
 """
-import h5py
 import numpy as np
-import scipy.io as sio
 from PIL import Image
 from skimage import color
 import glob

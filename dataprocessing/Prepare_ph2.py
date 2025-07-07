@@ -1,79 +1,88 @@
 # -*- coding: utf-8 -*-
 """
-Created on Sat Jun  8 18:15:43 2019
-@author: Reza Azad
+Updated ph2 data preparation script for CIELAB color space
 """
-from __future__ import division
+
 import numpy as np
-import scipy.io as sio
-import scipy.misc as sc
+from PIL import Image
+from skimage import color
 import glob
-import random
-#from sklearn.model_selection import train_test_split
+import os
 
 # Parameters
-height = 256
-width  = 256
+height = 224
+width  = 224
 channels = 3
 
+def convert_rgb_to_cielab(rgb_image):
+    """Convert RGB image to CIELAB"""
+    if rgb_image.max() > 1.0:
+        rgb_image = rgb_image.astype(np.float32) / 255.0
+    lab_image = color.rgb2lab(rgb_image)
+    return lab_image
+
 ############################################################# Prepare ph2 data set #################################################
-Dataset_add = 'data/'
-Tr_add = 'lesions/'
+Dataset_add = '/home/ad166/new/AttSwinUNet/PH2Dataset/PH2 Dataset images'
 
-Tr_list = glob.glob(Dataset_add+ Tr_add+'/*.bmp')
-# It contains 2594 training samples
-Data_train    = np.zeros([200, height, width, channels])
-Label_train   = np.zeros([200, height, width])
+# Each image is in a subfolder named IMDxxx
+image_folders = sorted(glob.glob(os.path.join(Dataset_add, 'IMD*')))
 
-print('Reading Ph2')
-
-random.shuffle(Tr_list)
-
-for idx in range(len(Tr_list)):
-    print(idx+1)
-    print(Tr_list[idx])
-    img = sc.imread(Tr_list[idx])
-
-   
-    img = np.double(sc.imresize(img, [height, width, channels], interp='bilinear', mode = 'RGB'))
-    Data_train[idx, :,:,:] = img
-
-    
-    b = Tr_list[idx]  
-
-    #print(b)  
-
-    a = b[0:len(Dataset_add)]
-    b = b[len(b)-10: len(b)-4] 
-
-    # print(a)
-    # print(b)
+num_samples = len(image_folders)
+Data_ph2 = np.zeros([num_samples, height, width, channels], dtype=np.float32)
+Label_ph2 = np.zeros([num_samples, height, width], dtype=np.float32)
 
 
-    add = (a+ 'masks/' + b +'_lesion.bmp')    
-    img2 = sc.imread(add)
-    img2 = np.double(sc.imresize(img2, [height, width], interp='bilinear'))
-    Label_train[idx, :,:] = img2    
-         
-print('Reading Ph2 finished')
+print('Reading PH2 and converting to CIELAB')
+for idx, folder in enumerate(image_folders):
+    if idx % 20 == 0:
+        print(f'Processing image {idx+1}/{num_samples}')
+    # Find dermoscopic image
+    derm_img_path = glob.glob(os.path.join(folder, '*_Dermoscopic_Image', '*.bmp'))
+    if len(derm_img_path) == 0:
+        derm_img_path = glob.glob(os.path.join(folder, '*_Dermoscopic_Image', '*.png'))
+    if len(derm_img_path) == 0:
+        print(f"Could not find dermoscopic image in {folder}")
+        continue
+    img = np.array(Image.open(derm_img_path[0]))
+    img = np.array(Image.fromarray(img.astype('uint8')).resize((width, height), Image.BILINEAR))
+    img_lab = convert_rgb_to_cielab(img)
+    Data_ph2[idx, :, :, :] = img_lab
+
+    # Find lesion mask
+    mask_path = glob.glob(os.path.join(folder, '*_lesion', '*.bmp'))
+    if len(mask_path) == 0:
+        mask_path = glob.glob(os.path.join(folder, '*_lesion', '*.png'))
+    if len(mask_path) == 0:
+        print(f"Could not find lesion mask in {folder}")
+        continue
+    mask = np.array(Image.open(mask_path[0]))
+    # If mask is RGB, convert to grayscale
+    if mask.ndim == 3:
+        mask = mask[..., 0]
+    mask = np.array(Image.fromarray(mask.astype('uint8')).resize((width, height), Image.BILINEAR), dtype=np.float32)
+    Label_ph2[idx, :, :] = mask
+
+print('Reading PH2 finished - Data is now in CIELAB color space')
 
 ################################################################ Make the train and test sets ########################################    
-# We consider 80 samples for training, 20 samples for validation and 100 samples for testing
+# Example split: 80 train, 20 val, rest test (adjust as needed)
+n_train = 80
+n_val = 20
+n_test = num_samples - n_train - n_val
 
+Train_img = Data_ph2[0:n_train, :, :, :]
+Validation_img = Data_ph2[n_train:n_train+n_val, :, :, :]
+Test_img = Data_ph2[n_train+n_val:, :, :, :]
 
-Train_img      = Data_train[0:80,:,:,:]
-Validation_img = Data_train[80:100,:,:,:]
-Test_img       = Data_train[100:200,:,:,:]
+Train_mask = Label_ph2[0:n_train, :, :]
+Validation_mask = Label_ph2[n_train:n_train+n_val, :, :]
+Test_mask = Label_ph2[n_train+n_val:, :, :]
 
-Train_mask      = Label_train[0:80,:,:]
-Validation_mask = Label_train[80:100,:,:]
-Test_mask       = Label_train[100:200,:,:]
+# Save the CIELAB data
+np.save('data_train_ph2_cielab', Train_img)
+np.save('data_test_ph2_cielab', Test_img)
+np.save('data_val_ph2_cielab', Validation_img)
 
-
-np.save('data_train', Train_img)
-np.save('data_test' , Test_img)
-np.save('data_val'  , Validation_img)
-
-np.save('mask_train', Train_mask)
-np.save('mask_test' , Test_mask)
-np.save('mask_val'  , Validation_mask)
+np.save('mask_train_ph2', Train_mask)
+np.save('mask_test_ph2', Test_mask)
+np.save('mask_val_ph2', Validation_mask)
