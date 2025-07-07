@@ -1,0 +1,15 @@
+## Config file for PH2 Fine-tuning
+lr:              1e-5 # Lower learning rate for fine-tuning
+epochs:          50 # Fewer epochs for fine-tuning
+number_classes:  1 # Number of classes in the target dataset
+batch_size_tr:   8 # Smaller batch size due to smaller dataset
+batch_size_va:   1 # Batch size for validation 
+saved_model_p:   './OUT_DIR/' # leave '' will use a default value 
+path_to_data:    './' #path to dataset
+patience:        15 # Higher patience for fine-tuning
+save_result:     './OUT_DIR/' # path to save results
+progress_p:      0.3 # Report more frequently due to smaller dataset
+pretrained:      1 # Load the ISIC 2018 trained weight
+
+color_space:     'CIELAB' # Color space being used
+data_format:     'CIELAB' # Data format identifier
