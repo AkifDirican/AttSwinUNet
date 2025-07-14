@@ -70,9 +70,9 @@ Validation_mask = Label_train_2018[1815:1815+259, :, :]
 Test_mask = Label_train_2018[1815+259:2594, :, :]
 
 # Save the CIELAB data
-np.save('data_train_cielab', Train_img)
-np.save('data_test_cielab', Test_img)
-np.save('data_val_cielab', Validation_img)
+np.save('data_train', Train_img)
+np.save('data_test', Test_img)
+np.save('data_val', Validation_img)
 
 np.save('mask_train', Train_mask)
 np.save('mask_test', Test_mask)
